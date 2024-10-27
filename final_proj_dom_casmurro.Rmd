@@ -36,9 +36,10 @@ library(tidytext)
 library(pdftools)
 library(tibble)
 library (stringr)
+library(dplyr)
 ```
 
-### Import data
+### Import data and process data
 
 The data is in PDF format, so first it is necessary to read the PDF file using `pdf_text`.
 ```{r}
@@ -48,9 +49,9 @@ dom_casmurro_pdf <- pdf_text("/Users/luizadivino/Downloads/domCasmurro.pdf")
 cat(dom_casmurro_pdf[1])
 ```
 
-Change format so that it is possible to access the data. Transforming the pdf to tibble separates the whole content in each page as if they were one single value. For it to be possible to analyse the data, it is necessary to tokenize the corpus word by word, making it possible to access in which page each word is located. This will leave us with two variables: `page` and `words`.
+Change format so that it is possible to access the data. Transforming the pdf to tibble separates the whole content in each page as if they were one single value. For it to be possible to analyse the data, it is necessary to tokenize the corpus word by word, making it possible to access in which page each word is located. This will leave us with two variables: `page` and `word`.
 
-Before going through this process, there were 128 observations (the book has 128 pages). The tokenization leaves us with 669267 observations, which represents the total number of words in the book, elements like "Chapter" and so on.
+Before going through this process, there were 128 observations (the book has 128 pages). The tokenization leaves us with 669267 observations, which represents the total number of words in the book, including elements like "Chapter", for example. 
 ```{r}
 # data transformation
 dom_casmurro_tibble <- tibble(page = 1:length(dom_casmurro_pdf), text = dom_casmurro_pdf)
@@ -64,6 +65,35 @@ dom_casmurro_tidy_text <- dom_casmurro_tibble %>%
 colnames(dom_casmurro_tidy_text) <- c("page", "word")
 ```
 
+For future analysis, it is a good idea to lowercase the whole corpus. For doing so, `str_to_lower_` will be used.
+```{r}
+dom_casmurro_tidy_text <- dom_casmurro_tidy_text %>%
+  mutate(word = str_to_lower(str_trim(word)))
+```
+
+
+### Previous analysis and use of stop wordlist
+
+To start, it is interesting to make a simple frequency list of words to have an overview of what have been used in the book.
+```{r}
+dom_casmurro_tidy_text %>% 
+  count(word, sort = TRUE)
+```
+
+To make it easier to access target words (`Capitu` and `Escobar` at an early stage of the analysis), a stop wordlist will be added in order to eliminate comon words.
+```{r}
+# add col_names so that the first word is not considered the name of the whole column
+# it is VERY IMPORTANT that columns in both datasets have THE SAME NAME ("word), in this case
+stopwords_path <- read.csv("/Users/luizadivino/Documents/Pitt Fall 2024/Data Science/proj/stopwords.txt", col.names = "word")
+
+# tibble the data
+stopwords_dom_casmurro <- tibble(stopwords_path)
+
+# lowercase the stop wordlist
+stopwords_dom_casmurro <- read.csv("/Users/luizadivino/Documents/Pitt Fall 2024/Data Science/proj/stopwords.txt", 
+                                   col.names = "word", 
+                                   stringsAsFactors = FALSE)
+```
 
 
 
