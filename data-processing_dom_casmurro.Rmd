@@ -1,0 +1,178 @@
+---
+title: "Final Project - Dom Casmurro"
+author: "LUIZA DIVINO"
+date: "2024-10-27"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Goal
+Verify how Capitu and Escobar are described throughout the story, making a comparison between how they were portrayed by Bentinho before and after the apparent adultery
+
+## Cleaning and reorganizing
+
+- Load all the packages that will be needed for the analysis
+
+- Import data: PDF ->
+
+- Tokenize data: words
+
+- Create columns: `text`, `word` and `page`
+
+- Lowercase data
+
+- Add stop wordlist without common words (https://gist.github.com/alopes/5358189) and create new dataset
+
+
+### Load packages
+```{r}
+library(tidyverse)
+library(tidytext)
+library(pdftools)
+library(tibble)
+library (stringr)
+library(dplyr)
+# found about this package (could not use it)
+library(lexiconPT)
+library(tm)
+```
+
+### Import data and process data
+
+The data is in PDF format, so first it is necessary to read the PDF file using `pdf_text`.
+```{r}
+dom_casmurro_pdf <- pdf_text("/Users/luizadivino/Downloads/domCasmurro.pdf")
+
+# use cat to have a preview of the first page
+cat(dom_casmurro_pdf[1])
+```
+
+Change format so that it is possible to access the data. Transforming the pdf to tibble separates the whole content in each page as if they were one single value. For it to be possible to analyse the data, it is necessary to tokenize the corpus word by word, making it possible to access in which page each word is located. This will leave us with two variables: `page` and `word`.
+
+Before going through this process, there were 128 observations (the book has 128 pages). The tokenization leaves us with 669267 observations, which represents the total number of words in the book, including elements like "Chapter", for example. 
+```{r}
+# data transformation
+dom_casmurro_pages <- tibble(page = 1:length(dom_casmurro_pdf), text = dom_casmurro_pdf)
+
+# data tokenization
+dom_casmurro_words <- dom_casmurro_pages %>%
+  unnest_tokens(word, text)
+
+# naming the columns "page" and "word" for them to match the names of the columns on the stop wordlist
+
+colnames(dom_casmurro_words) <- c("page", "word")
+```
+
+For future analysis, it is a good idea to lowercase the whole corpus. For doing so, `str_to_lower_` will be used.
+```{r}
+dom_casmurro_words <- dom_casmurro_words %>%
+  mutate(word = str_to_lower(str_trim(word)))
+```
+
+Frequency list of words to have an overview of what have been used in the book.
+```{r}
+dom_casmurro_words %>% 
+  count(word, sort = TRUE)
+```
+
+### Looking for context in which ""Capitu" and "Escobar" 
+
+#### Capitu
+As a starting point, I have focused on "Capitu", since her name is the first content word that shows on the list with the most frequent words (I had to look for it manually after using `count()`).
+
+
+"Finding" Capitu
+`str_view()` gives the whole page. This is not practical because it gives to much information, but it is a good mechanism to look for more context when needed.
+```{r}
+str_view(dom_casmurro_pages$text, "Capitu")
+```
+
+Context after Capitu (up to 10 words)
+```{r}
+# str_extract_all gives access to all
+# filter(is.na!) removes entries withou capitui
+
+dom_casmurro_pages %>%
+  mutate(word_after_capitu = str_extract_all(text, "Capitu(\\s+\\w+){5}")) %>%
+  unnest(word_after_capitu) %>% 
+  filter(!is.na(word_after_capitu)) %>%
+  select(word_after_capitu) %>%
+  print()
+
+```
+
+Context before Capitu (testing with 5)
+```{r}
+dom_casmurro_pages %>%
+  mutate(word_before_capitu = str_extract_all(text, "(\\b\\w+\\s+){5}Capitu")) %>%
+  unnest(word_before_capitu) %>% 
+  filter(!is.na(word_before_capitu)) %>%
+  select(word_before_capitu) %>%
+  print()
+```
+Testing `lexiconPT` package
+```{r}
+dom_casmurro_pages %>% 
+  get_word_sentiment("amava")
+```
+
+
+Context before and after Capitu
+```{r}
+dom_casmurro_pages %>%
+  mutate(context_around_capitu = str_extract_all(text, "(\\b\\w+\\s+){1,10}Capitu(\\s+\\w+){1,10}")) %>%
+  unnest(context_around_capitu) %>% 
+  filter(!is.na(context_around_capitu)) %>%
+  select(context_around_capitu) %>%
+  print()
+```
+
+### Use of stop wordlist
+
+To make it easier to access target words (`Capitu` and `Escobar` at an early stage of the analysis), a stop wordlist will be added in order to eliminate comon words. 
+```{r}
+# add col_names so that the first word is not considered the name of the whole column
+# it is VERY IMPORTANT that columns in both datasets have THE SAME NAME ("word), in this case
+# include "header = FALSE" to include first observation 
+stopwords_path <- read.csv("/Users/luizadivino/Documents/Pitt Fall 2024/Data Science/proj/stopwords.txt", 
+                           col.names = "word",
+                           header = FALSE)
+
+# tibble the data
+stopwords_dom_casmurro <- tibble(stopwords_path)
+```
+
+Using word count again after adding stop wordlist.Still trying to figure out how to add the stoplist because the code used did not do exactly what I was hopping it would.
+```{r}
+# creating new dataset for this specific analysis. further analysis will be made with the other dataset
+dom_casmurro_words_filtered <- dom_casmurro_words %>%
+  filter(!word %in% stopwords_dom_casmurro$word)
+
+# see the differences
+
+# word count without common words
+# something os going wrong
+dom_casmurro_words_without_stopwords %>%
+  count(word, sort = TRUE) 
+
+# trying another package (tm)
+dom_casmurro_words_filtered <- dom_casmurro_words %>%
+  filter(!word %in% stopwords("pt"))
+```
+
+## Sentiment analysis
+
+This is a test with the `lexiconPT` package. I 
+```{r}
+sentimentos <- sentiments_pt()
+
+stopwords("pt")
+```
+
+
+
+
+
