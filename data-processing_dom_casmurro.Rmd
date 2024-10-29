@@ -1,5 +1,5 @@
 ---
-title: "Final Project - Dom Casmurro"
+title: "Data Processing - Dom Casmurro"
 author: "LUIZA DIVINO"
 date: "2024-10-27"
 output: github_document
@@ -16,7 +16,7 @@ Verify how Capitu and Escobar are described throughout the story, making a compa
 
 - Load all the packages that will be needed for the analysis
 
-- Import data: PDF ->
+- Import data: PDF (transform data to a df)
 
 - Tokenize data: words
 
@@ -86,14 +86,15 @@ As a starting point, I have focused on "Capitu", since her name is the first con
 
 "Finding" Capitu
 `str_view()` gives the whole page. This is not practical because it gives to much information, but it is a good mechanism to look for more context when needed.
-```{r}
+```{r, include=FALSE}
 str_view(dom_casmurro_pages$text, "Capitu")
 ```
 
 Context after Capitu (up to 10 words)
+I tested a lot of different lengths and I might go with 5.
 ```{r}
 # str_extract_all gives access to all
-# filter(is.na!) removes entries withou capitui
+# filter(is.na!) removes entries without capitui
 
 dom_casmurro_pages %>%
   mutate(word_after_capitu = str_extract_all(text, "Capitu(\\s+\\w+){5}")) %>%
@@ -113,17 +114,12 @@ dom_casmurro_pages %>%
   select(word_before_capitu) %>%
   print()
 ```
-Testing `lexiconPT` package
-```{r}
-dom_casmurro_pages %>% 
-  get_word_sentiment("amava")
-```
 
 
 Context before and after Capitu
 ```{r}
 dom_casmurro_pages %>%
-  mutate(context_around_capitu = str_extract_all(text, "(\\b\\w+\\s+){1,10}Capitu(\\s+\\w+){1,10}")) %>%
+  mutate(context_around_capitu = str_extract_all(text, "(\\b\\w+\\s+){5}Capitu(\\s+\\w+){5}")) %>%
   unnest(context_around_capitu) %>% 
   filter(!is.na(context_around_capitu)) %>%
   select(context_around_capitu) %>%
@@ -132,45 +128,28 @@ dom_casmurro_pages %>%
 
 ### Use of stop wordlist
 
-To make it easier to access target words (`Capitu` and `Escobar` at an early stage of the analysis), a stop wordlist will be added in order to eliminate comon words. 
+To make it easier to access target words (`Capitu` and `Escobar` at an early stage of the analysis), a stop word list will be added in order to eliminate common words. 
+First, I tried to include an external stop word list. For some reason, when I tried to get a new ds filtering only the words that were not included in that list, I was getting weird results. It did show that I had fewer observations, which was the expected, but when I went to check the new ds, it still contained words that were on the list. 
+After trying different approaches and doing some research on different packages, I discovered there is a Portuguese stop word list included in the `tm` package which seemed to have all the same words I wanted to add with that other stop word list, so I decided to use this one.
+
 ```{r}
-# add col_names so that the first word is not considered the name of the whole column
-# it is VERY IMPORTANT that columns in both datasets have THE SAME NAME ("word), in this case
-# include "header = FALSE" to include first observation 
-stopwords_path <- read.csv("/Users/luizadivino/Documents/Pitt Fall 2024/Data Science/proj/stopwords.txt", 
-                           col.names = "word",
-                           header = FALSE)
-
-# tibble the data
-stopwords_dom_casmurro <- tibble(stopwords_path)
-```
-
-Using word count again after adding stop wordlist.Still trying to figure out how to add the stoplist because the code used did not do exactly what I was hopping it would.
-```{r}
-# creating new dataset for this specific analysis. further analysis will be made with the other dataset
-dom_casmurro_words_filtered <- dom_casmurro_words %>%
-  filter(!word %in% stopwords_dom_casmurro$word)
-
-# see the differences
-
-# word count without common words
-# something os going wrong
-dom_casmurro_words_without_stopwords %>%
-  count(word, sort = TRUE) 
+# check stopwords in pt
+stopwords("pt")
 
 # trying another package (tm)
 dom_casmurro_words_filtered <- dom_casmurro_words %>%
   filter(!word %in% stopwords("pt"))
+
+# word count without common words
+dom_casmurro_words_filtered %>% 
+  count(word, sort = TRUE)
 ```
+
+By using these stopwords, I could see more how `Capitu` is the most none common word used throughout the book.
+
+
 
 ## Sentiment analysis
-
-This is a test with the `lexiconPT` package. I 
-```{r}
-sentimentos <- sentiments_pt()
-
-stopwords("pt")
-```
 
 
 
