@@ -71,7 +71,7 @@ The data is in PDF format, so first it is necessary to read the PDF file
 using `pdf_text`.
 
 ``` r
-dom_casmurro_pdf <- pdf_text("/Users/luizadivino/Downloads/domCasmurro.pdf")
+dom_casmurro_pdf <- pdf_text("data/domCasmurro.pdf")
 
 # use cat to have a preview of the first page
 cat(dom_casmurro_pdf[1])
@@ -204,7 +204,7 @@ lengths and I might go with 5.
 
 ``` r
 # str_extract_all gives access to all
-# filter(is.na!) removes entries without capitui
+# filter(is.na!) removes entries without capitu
 
 dom_casmurro_pages %>%
   mutate(word_after_capitu = str_extract_all(text, "Capitu(\\s+\\w+){5}")) %>%
@@ -374,4 +374,49 @@ dom_casmurro_words_filtered %>%
 By using these stopwords, I could see more how `Capitu` is the most none
 common word used throughout the book.
 
-## Sentiment analysis
+## Saving data
+
+``` r
+write_csv(dom_casmurro_pages, "data_pages.csv")
+
+write_csv(dom_casmurro_words, "data_words.csv")
+```
+
+## Experiment with POS tagger
+
+### Download packages
+
+``` r
+#install.packages("udpipe")
+#install.packages("flextable")
+#install.packages("here")
+# install klippy for copy-to-clipboard button in code chunks
+#install.packages("remotes")
+#remotes::install_github("rlesur/klippy")
+```
+
+### Load packages
+
+``` r
+#library(udpipe)
+#library(flextable)
+# activate klippy for copy-to-clipboard button
+#klippy::klippy()
+```
+
+### Downloading the pt-model
+
+For some reason, it says on the website that there is a model for pt-br,
+but when I try to download it, it says it does not exist. Since this is
+and older text, perhaps it might also works with pt-pt since there are
+some small differences.
+
+``` r
+#m_port   <- udpipe_download_model(language = "portuguese-gsd")
+```
+
+### Load models
+
+``` r
+#m_port <- udpipe_load_model(file = here::here("udpipemodels", "portuguese-gsd-ud-2.5-191206.udpipe"))
+```
