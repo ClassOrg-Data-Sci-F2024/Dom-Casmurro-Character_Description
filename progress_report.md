@@ -11,18 +11,19 @@ Packages used so far: `tidyverse` `tidytext` `pdftools` `tibble`
 I have managed to import the dataset as a PDF and transformed the data
 into a data frame. I have 3 datasets: `dom_casmurro_pages_`, with 128
 observations, each of giving access to the amount of text in each of the
-128 pages; `dom_casmurro_words`, where each observation is a different
-word, divided by page number; and `dom_casmurro_words_filtered`, where I
-added a stop wordlist, which gives me easy access to content words.
+128 pages; `dom_casmurro_words`, with 66,927 observations, where each
+observation is a different word, divided by page number; and
+`dom_casmurro_words_filtered`, with 35,884, after “adding” a stop word
+list, which gave me easy access to content words.
 
 I started by using `count()` to see what were the most common words, the
-decided it would be valueble to have a list that did not include comon
+decided it would be valuable to have a list that did not include common
 words. Initially, I was trying to add a stop word list found on
 <https://gist.github.com/alopes/5358189>. I then discovered that the
 package `tm` has its own stopwords also for Portuguese, which makes the
 coding process a bit easier.
 
-I started working firstly with `Capitu`, trying to figure out how long
+I started working firstly with `capitu`, trying to figure out how long
 the ngrams could be. I tried with different lengths, from 1 to 10 words
 and I might work with 5. I had 3 different approaches: only right
 context, only left context, and both right and left contexts together. I
