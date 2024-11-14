@@ -5,6 +5,8 @@ LUIZA DIVINO
 
 # 1st Progress Report
 
+### October 28th
+
 Packages used so far: `tidyverse` `tidytext` `pdftools` `tibble`
 `stringr` `dplyr` `tm`
 
@@ -47,3 +49,32 @@ very “automatic”
 
 - Discover how to use `lexiconPT` for Sentiment Analysis or find a
   different package to work with Portuguese
+
+# 2nd Progress Report
+
+### November 11th
+
+At this stage, I did not progress much on what I had previously done
+because I see the next step as the tagging process. I have been reading
+about POS-Tagging and I discovered about `udpipe` (Wijffels 2021)
+(<https://ladal.edu.au/tagging.html>) which, in theory, has a Brazilian
+Portuguese as one of the options for language models to download. It
+turns out it had only [European
+Portuguese](https://github.com/ClassOrg-Data-Sci-F2024/Dom-Casmurro-Character_Description/blob/main/portuguese-gsd-ud-2.5-191206.udpipe)
+and even though I was able to download it, I kept on getting error
+messages when trying to use it. My goal was to use an R package to tag
+the corpus but, if none of them work, I will download the
+[TreeTagger](https://www.cis.uni-muenchen.de/~schmid/tools/TreeTagger/).
+Even though the data is not yet tagged, I added csv files for both the
+[pages
+file](https://github.com/ClassOrg-Data-Sci-F2024/Dom-Casmurro-Character_Description/blob/main/data/data_pages.csv)
+and also the [words
+file](https://github.com/ClassOrg-Data-Sci-F2024/Dom-Casmurro-Character_Description/blob/main/data/data_words.csv).
+
+#### License
+
+Since this is a text that belongs to the public domain and I have no
+restrictions on sharing the results I will obtain with this research, I
+chose the MIT License that only requires preservation of copyright and
+license notices. If this is helpful to anyone, I just want to be
+acknowledged for it.
