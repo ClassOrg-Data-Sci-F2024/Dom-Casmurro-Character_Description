@@ -1,0 +1,176 @@
+---
+title: "data wrangling"
+author: "LUIZA DIVINO"
+date: "2024-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidytext)
+library(pdftools)
+library(tibble)
+library (stringr)
+library(dplyr)
+library(stopwords)
+library(udpipe)
+library(flextable)
+library(ggplot2)
+library(ggwordcloud)
+```
+
+# Clean and tag corpus
+  1. First of all, it is necessary to upload the corpus into Rstudio. The corpus is in PDF format.
+```{r}
+dom_casmurro_pdf <- pdf_text("data/domCasmurro.pdf")
+```
+
+  2. Transform the pdf to tibble separates the whole book in different pages. It is also necessary to tokenize the corpus word by word. For different types of analysis, it is interesting to have the data divided by `page` and also by `word`. It is also necessary to flatten the corpus to tag it. This will leave us with two datasets and one "value string": `dom_casmurro_page`, `dom_casmurro_word` and `dom_casmurro_text`.
+
+```{r}
+# Data transformation to page
+dom_casmurro_pages <- tibble(page = 1:length(dom_casmurro_pdf), text = dom_casmurro_pdf)
+
+# Flatten the data to tag it
+dom_casmurro_text <- str_flatten(dom_casmurro_pages$text)
+
+# Text tokenization by word + lowercase
+dom_casmurro_words <- dom_casmurro_pages %>%
+  unnest_tokens(word, text) %>% 
+  mutate(word = str_to_lower(str_trim(word)))
+```
+
+  3. In order to have easier access to content word frequency, it is important to clean the corpus by adding a stop word list with function words. I decided to use the package `stopwords`, where I had three source options. After testing all three, `nlkt` was the one which showed the best result, so I decided to use it. After checking the word frequency list, I added some more words to the list because I noticed some verbs were still there. I checked the list up to 50 occurrences because it would affect the word cloud. I decided no to take "capítulo" (chapter) out because the narrator uses it also inside the text, not only to name each chapter.
+
+```{r}
+# Creating stop word list
+stopwords_pt <- c(stopwords(
+  "pt", source = "nltk"), 
+  "disse",
+  "ser",
+  "lo",
+  "ia",
+  "dizer",
+  "fez",
+  "pode",
+  "la",
+  "ir",
+  "ver",
+  "podia",
+  "vi",
+  "falar",
+  "quis",
+  "sei",
+  "ter"
+  )
+
+# Adding stop word list
+dom_casmurro_words_filtered <- dom_casmurro_words %>%
+  filter(!word %in% stopwords_pt)
+```
+
+  4. For the corpus to be tagged, I chose the `portuguese-bosque` language model because it is a Portuguese treebank that includes both Brazilian and European Portuguese.
+```{r}
+# Activating klippy for copy-to-clipboard button
+klippy::klippy()
+
+# Downloading model
+port_model <- udpipe_download_model(language = "portuguese-bosque")
+
+# Load model
+port <- udpipe_load_model(file = port_model$file_model)
+
+# Tag corpus
+dom_casmurro_pos <- udpipe::udpipe_annotate(port, x = dom_casmurro_text) %>% 
+  as.data.frame()
+```
+
+# Data analysis
+
+### Wordcount
+After cleaning the corpus, the next step was to check word frequency. As it is possible to see, `Capitu` is the word the comes up the most.
+```{r}
+dom_casmurro_words_filtered %>% 
+  count(word, sort = TRUE) %>% 
+  head(n = 10)
+```
+
+This is also visible in this wordcloud, which shows all the words that occur more than 50 times
+```{r}
+dom_casmurro_words_filtered %>% 
+  count(word, sort = TRUE) %>% 
+  filter (n > 50) %>% 
+  ggplot(aes(label = word, size = n)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 10) + 
+  theme_minimal()
+```
+
+## Capitu
+After seeing the wordcloud, I decided to look for specific terms with "Capitu"
+```{r}
+capitu_data <- dom_casmurro_pos %>% 
+  filter(token == "Capitu")  
+
+dom_casmurro_pos %>%
+  mutate(word_before_capitu = str_extract_all(sentence, "(\\b\\w+\\s+){5}Capitu")) %>%
+  unnest(word_before_capitu) %>% 
+  filter(!is.na(word_before_capitu)) %>%
+  head()
+```
+
+```{r}
+verbs_after_capitu <- dom_casmurro_pos %>%
+  mutate(next_word = lead(sentence), next_pos = lead(upos)) %>%
+  filter(token == "Capitu" & next_pos == "VERB") %>%
+  select(sentence, next_word, next_pos)
+
+print(verbs_after_capitu)
+```
+
+#### Olhos
+```{r}
+dom_casmurro_pos %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}Capitu.*?olhos(\\s+\\b\\w+\\b){0,10}")) %>%
+  filter(!is.na(context)) %>%
+  select(context) %>%
+  head()
+```
+
+First, I try to detect occurences of "Capitu" and "olhos" (eyes), because going throuth the data, it is possible to see how much the narrator talks about her eyes.
+```{r}
+dom_casmurro_pos %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}Capitu.*?olhos(\\s+\\b\\w+\\b){0,10}")) %>%
+  filter(!is.na(context)) %>%
+  select(context) %>%
+  head()
+```
+
+```{r}
+dom_casmurro_pos %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.*?Capitu(\\s+\\b\\w+\\b){0,10}")) %>%
+  filter(!is.na(context)) %>%
+  select(context) %>%
+  head()
+```
+
+```{r}
+dom_casmurro_pos %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.*?dissimulada(\\s+\\b\\w+\\b){0,10}")) %>%
+  filter(!is.na(context)) %>%
+  select(context) %>%
+  head()
+```
+
+```{r}
+dom_casmurro_pos %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos(\\s+\\b\\w+\\b){0,10}")) %>%
+  filter(!is.na(context)) %>%
+  select(context) %>%
+  head()
+```
+
+```{r}
+sessionInfo()
+```
