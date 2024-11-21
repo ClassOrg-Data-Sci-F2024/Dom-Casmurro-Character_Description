@@ -120,6 +120,7 @@ dom_casmurro_pos %>%
   head()
 ```
 
+#### Verbs after Capitu
 ```{r}
 verbs_after_capitu <- dom_casmurro_pos %>%
   mutate(next_word = lead(sentence), next_pos = lead(upos)) %>%
