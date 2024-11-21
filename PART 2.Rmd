@@ -142,14 +142,6 @@ dom_casmurro_pos %>%
 First, I try to detect occurences of "Capitu" and "olhos" (eyes), because going throuth the data, it is possible to see how much the narrator talks about her eyes.
 ```{r}
 dom_casmurro_pos %>%
-  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}Capitu.*?olhos(\\s+\\b\\w+\\b){0,10}")) %>%
-  filter(!is.na(context)) %>%
-  select(context) %>%
-  head()
-```
-
-```{r}
-dom_casmurro_pos %>%
   mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.*?Capitu(\\s+\\b\\w+\\b){0,10}")) %>%
   filter(!is.na(context)) %>%
   select(context) %>%
@@ -158,7 +150,7 @@ dom_casmurro_pos %>%
 
 ```{r}
 dom_casmurro_pos %>%
-  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.*?dissimulada(\\s+\\b\\w+\\b){0,10}")) %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.(\\s+\\b\\w+\\b){0,10}")) %>%
   filter(!is.na(context)) %>%
   select(context) %>%
   head()
@@ -166,7 +158,7 @@ dom_casmurro_pos %>%
 
 ```{r}
 dom_casmurro_pos %>%
-  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos(\\s+\\b\\w+\\b){0,10}")) %>%
+  mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.*?dissimulada(\\s+\\b\\w+\\b){0,10}")) %>%
   filter(!is.na(context)) %>%
   select(context) %>%
   head()
