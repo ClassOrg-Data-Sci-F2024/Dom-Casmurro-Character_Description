@@ -1,0 +1,525 @@
+---
+title: "Dom Casmurro Character Description"
+author: "LUIZA SARMENTO DIVINO"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+    theme: cerulean
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pdftools)
+library(tidyverse)
+library(udpipe)
+library(ggwordcloud)
+library(lexiconPT)
+library(patchwork)
+library(pander)
+```
+
+<div style="text-align: center;">
+  <img src="https://m.media-amazon.com/images/I/81XpG2iKTlL._AC_UF1000,1000_QL80_.jpg" alt="Book cover" width="300"/>
+  <p><em>Figure 1:</em> Book cover. Image source: Available at <a href="https://m.media-amazon.com/images/I/81XpG2iKTlL._AC_UF1000,1000_QL80_.jpg" target="_blank">https://m.media-amazon.com/images/I/81XpG2iKTlL._AC_UF1000,1000_QL80_.jpg</a>. Accessed on: December 1, 2024.</p>
+</div>
+
+
+
+
+# Project details
+
+This project focuses on  *Dom Casmurro* by Machado de Assis (1839-1908), a Brazilian author. 
+The story is told by a first person narrator, Bentinho, who induces the readers to believe that his wife **Capitu** had an affair with one of his best friends, Escobar.
+
+## The book
+- Published in 1899
+
+- 148 chapters
+
+- 128 pages
+
+
+### Summary of *Dom Casmurro*
+
+- **Narrator:** Bentinho (Dom Casmurro) tells his story, describing his life and his disappointments.
+
+- **Childhood:** Bentinho grows up in Rio de Janeiro with his mother, Dona Evarista, and his childhood friend, Escobar.
+
+- **Capitu:** Bentinho falls in love with Capitu, his childhood friend and future wife, described as having “the eyes of an oblique and dissimulated gypsy”.
+
+- **Religion and school:** Bentinho is sent to the seminary, where he struggles with his religious call and his feelings for Capitu.
+
+- **Relationship with Capitu:** During their separation at the seminary, Bentinho believes that Capitu is distancing herself from him, but they marry after he leaves the seminary.
+
+- **Jealousy and distrust:** Bentinho, now married, begins to doubt Capitu's fidelity, especially after the birth of their son, Ezequiel.
+
+- **Escobar:** Bentinho is friends with Escobar, but the relationship deteriorates due to jealousy. He believes that Escobar is having an affair with Capitu.
+
+- **Escobar's death:** Escobar dies, but Bentinho continues to have doubts about Capitu, convinced that she has cheated on him with his friend.
+
+- **The Tragedy:** Bentinho moves away from Capitu and their son, Ezequiel, and leads a lonely life, convinced that he has been cheated on.
+
+- **The End:** The book ends with Bentinho, now an adult, reflecting on his life and his disillusionment, unable to resolve his doubts about Capitu and Escobar.
+
+### Dom Casmurro and Corpus Linguistics
+
+*Kauffman (2020)*
+
+Analyzes linguistic variation in Machado de Assis's fictional prose through a Corpus Linguistics approach. 
+
+- Two corpora were used: the Machado de Assis Literary Corpus (CLIMA), containing 9 novels and 76 short stories (859,521 words), and the Comparable Literary Corpus (CLIC), featuring works by 23 contemporary writers (3,386,037 words). Both corpora were tagged for part-of-speech and normalized. 
+
+- Using multidimensional analyses (MDA), linguistic features and co-occurring words were examined to identify functional and lexical dimensions of variation. 
+
+- The findings revealed three stylistic dimensions in Machado's works: Formal Introspective Romanticism, Sentimental Oralized Narrative, and Dramatic Representation, offering insights into his aesthetic and thematic style compared to his contemporaries.
+
+*Viana, V., Fausto, F., & Zyngier, S. (2007)*
+
+This study compared the writing styles of Machado de Assis and Dan Brown by analyzing Dom Casmurro and The Da Vinci Code. 
+
+- Both novels were digitized and analyzed using corpus linguistics tools to identify frequent lexical bundles. 
+
+- The results showed that The Da Vinci Code contained more repeated lexical bundles, which may explain its higher popularity compared to Dom Casmurro.
+
+### Research questions
+*(How)* Does Bentinho's description of Capitu evolve throughout *Dom Casmurro*?
+  
+  a. What do the most frequent content words in the book suggest about its story?
+  b. Are there more positive/negative words in specific parts of the story?
+  c. Which grammatical categories co-ocurr more often with “Capitu” and what could it indicate?
+
+### Hypothesis 
+- The description changes from the beginning to the end.
+
+- There are more positive words at the beginning than at the end.
+
+- There are more negative words at the end than at the beginning.
+
+### Steps
+- Load, clean and tag the corpus
+
+- Access content words
+
+- Find words with positive and negative polarities: (1) from the whole book, (2) related to Capitu
+
+- Find most common grammatical categories that co-ocurr with Capitu
+
+- Use examples to explain result interpretation
+
+### Packages used
+
+- `pdftools`
+
+- `tidyverse`
+
+- `udpipe`
+
+- `ggwordcloud`
+
+- `lexiconPT`
+
+- `patchwork`
+
+- `pander`
+
+# Uploading, cleaning and tagging the corpus
+## Uploading the corpus into RStudio
+The first thing that needs to be done is uploading the book, which is originally a PDF. 
+
+In order to do so, I have used the function `pdf_text()`. 
+
+To see how the first page of the PDF looks like, I used `cat()` because it gives me the original format.
+
+```{r}
+dom_casmurro_pdf <- pdf_text("data/domCasmurro.pdf")
+
+cat(dom_casmurro_pdf[1])
+
+```
+
+
+## Data transformation
+Next, I needed to transform the data into a format that could be tagged, so I first used the function `tibble()`, which had every row as a page. 
+
+For my research purposes, I used `str_flatten()` to get the text as a whole, so that I could access the results of word co-occurrences.
+
+```{r}
+# Data transformation to page
+dom_casmurro_pages <- tibble(page = 1:length(dom_casmurro_pdf), text = dom_casmurro_pdf)
+
+# Flatten the data to tag it
+dom_casmurro_text <- str_flatten(dom_casmurro_pages$text)
+```
+
+## Tagging process
+I used `port_model <- udpipe_download_model(language = "portuguese-bosque")` and `port <- udpipe_load_model(file = port_model$file_model)` to download and load a Portuguese Language Model in order to tag the corpus.  
+
+I chose the `portuguese-bosque` Language Model by selecting `language = "portuguese-bosque"` and the reason why I chose this one is because
+
+- 1. the `portuguese-br` Model was not available and 
+
+- 2. the `portuguese-bosque` is a Portuguese Treebank that includes both Brazilian and European varieties. 
+
+To use the POS-Tagger, I used `udpipe_annotate()`
+
+```{r, include=FALSE}
+# Downloading model
+port_model <- udpipe_download_model(language = "portuguese-bosque")
+
+# Load model
+port <- udpipe_load_model(file = port_model$file_model)
+```
+
+```{r}
+# Tagging the corpus
+dom_casmurro_pos <- udpipe::udpipe_annotate(port, x = dom_casmurro_text) %>% 
+  as.data.frame()
+
+# Choosing columns that are going to be useful for the analysis
+colnames(dom_casmurro_pos)
+
+# Selecting variables that will be used
+dom_casmurro_pos <- select(
+  dom_casmurro_pos, 
+  "paragraph_id",
+  "sentence_id",
+  "sentence",
+  "token_id",
+  "token",
+  "lemma",
+  "upos")
+
+# Counting how many words there are
+dom_casmurro_pos %>% 
+  count(token) %>% 
+  summarise(total = sum(n))
+
+# Printing a small part of the dataframe
+pander(head(dom_casmurro_pos, 10), caption = "dom_casmurro_pos")
+```
+
+## Cleaning the corpus
+Initially, I tested different stop word lists to get rid of all the words that could be considered irrelevant and could be ignored for different parts of the analysis, but I decided to select the different parts of speech I did not want to include in the word count or for the sentiment analysis. 
+
+### Content words
+After going through the data, I decided to leave just proper names (`PROPN`), nouns (`NOUN`) and adjectives (`ADJ`). 
+
+```{r}
+# Selecting grammatical categories that are useful for content word count
+dom_casmurro_pos_content_words <- dom_casmurro_pos %>%
+  filter(upos == "PROPN" | upos == "NOUN" | upos == "AJD") %>% 
+  select(token) %>% 
+  mutate(token = str_to_lower(token)) 
+
+# Counting words left
+dom_casmurro_pos_content_words %>% 
+  count(token) %>%
+  summarise(total = sum(n))
+```
+
+### Sentiment analysis
+For the sentiment analysis, I left punctuation (`PUNCT`), articles (`DET`), prepositions (`ADP`) and pronouns (`PRON`) out. 
+```{r}
+# Choosing gramatical categories that are useful for Sentiment Analysis
+dom_casmurro_pos_sentiment <- dom_casmurro_pos %>%
+  filter(!upos == "PUNCT" & !upos == "DET" & !upos == "ADP" & !upos == "PRON") %>% 
+  select(token, paragraph_id) %>% 
+  mutate(token = str_to_lower(token)) 
+
+# Counting words left
+dom_casmurro_pos_sentiment %>% 
+  count(token) %>%
+  summarise(total = sum(n))
+```
+
+
+# Data analysis
+## Word count
+First of all, I wanted to check what the most frequent content words were. The results show that `Capitu` is the most frequent content word.
+```{r}
+dom_casmurro_pos_content_words %>% 
+  count(token, sort = TRUE) %>% 
+  head(10)
+```
+
+## Sentiment analysis
+I chose the `oplexicon_v3.0` dictionary, available in the `lexiconPT` package for the Sentiment Analysis because after testing all three available dictionaries (`oplexicon_v2.1` and `sentiLex_lem_PT02`), this seemed to have more words that matched the ones in `dom_casmurro-pos`. 
+
+However, it is still not as complete as it could be, because after using `inner_join()`, the dataframe was left with way less observations.
+```{r}
+dom_casmurro_pos_sentiment_oplexicon_v3.0 <- dom_casmurro_pos_sentiment %>% 
+  inner_join(oplexicon_v3.0, by = c("token" = "term"),
+             relationship = "many-to-many")
+
+dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  count(polarity) 
+# Printing a small part of the dataframe
+pander(head(dom_casmurro_pos_sentiment_oplexicon_v3.0, 10), caption = "dom_casmurro_pos_sentiment_oplexicon_v3.0")
+
+# Comparing total of words left after Sentiment Analysis
+dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  count(polarity) %>%
+  summarise(total = sum(n))
+
+dom_casmurro_pos_sentiment %>% 
+  count(token) %>%
+  summarise(total = sum(n))
+```
+
+
+### Plots with positive and negative polarity words
+In order to visualize the distribution of words with positive and negative polarity throughout the book, I decided to create two bar plots, one with positive and the other with negative words. 
+
+To do so, I grouped both words into paragraphs, so that I could track changes from the begging to the end.
+```{r fig.align="center", fig.width=12, fig.height=6}
+# Positive words
+dom_casmurro_pos_sentiment_oplexicon_v3.0_positive <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>%
+  filter(polarity == "1") %>%
+  group_by(paragraph_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# Graph positive
+dom_casmurro_positive <- ggplot(dom_casmurro_pos_sentiment_oplexicon_v3.0_positive, aes(x = paragraph_id, y = n)) +
+  geom_bar(stat = "identity", color = "green") +
+  labs(title = "Positive words distribution",
+       x = "Paragraphs",
+       y = "Number of positive words") +
+  theme_minimal()
+
+# Negative words
+dom_casmurro_pos_sentiment_oplexicon_v3.0_negative <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>%
+  filter(polarity == "-1") %>%
+  group_by(paragraph_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# Graph negative
+dom_casmurro_negative <- ggplot(dom_casmurro_pos_sentiment_oplexicon_v3.0_negative, aes(x = paragraph_id, y = n)) +
+  geom_bar(stat = "identity", color = "red") +
+  labs(title = "Negative words distribution",
+       x = "Paragraphs",
+       y = "Number of negative words") +
+  theme_minimal()
+```
+
+### Words near Capitu
+The goal was to find words that commonly occured with Capitu.
+
+I added `token_id_total` to create a sequential number for each word in the text (`dom_casmurro_pos`), so I could track each word's position.
+
+To find "Capitu" positions, I filtered occurrences of the word "Capitu" and saved their positions (`token_id_capitu`).
+
+Then, I wanted to combine the positions of "Capitu" with all words in the text, enabling comparisons. (`token_id_capitu = token_id_total`)
+
+I chose a range to keep only words within 5 positions before or after "Capitu" (`token_id_capitu - 5` to `token_id_capitu + 5`).
+
+After that, I removed "Capitu" from its own context and left only some information (`paragraph_id`, `token`, `token_id`, ``token_id_total`, `token_id_capitu` and `upos`).
+
+
+```{r}
+# Selecting words within 5 positions before and after "Capitu"
+dom_casmurro_pos <- dom_casmurro_pos %>%
+  mutate(token_id_total = row_number())
+
+context_capitu <- dom_casmurro_pos %>%
+  filter(token == "Capitu") %>%
+  select(token_id_capitu = token_id_total, paragraph_id) %>%
+  inner_join(dom_casmurro_pos, by = "paragraph_id", relationship = "many-to-many") %>%
+  filter(token_id_total >= token_id_capitu - 5 & token_id_total <= token_id_capitu + 5) %>%
+  filter(token_id != token_id_capitu) %>%
+  select(paragraph_id, token, token_id, token_id_total, token_id_capitu, upos)
+
+# Printing a small part of the dataframe
+pander(head(context_capitu, 10), caption = "capitu_context")
+
+# Sentiment analysis with words near Capitu
+sentiment_words_near_capitu <- context_capitu %>% 
+  inner_join(lexiconPT::oplexicon_v3.0, by = c ("token" = "term"))
+
+sentiment_words_near_capitu %>% 
+  count(polarity)
+```
+
+### Plots with positive and negative polarity words near Capitu
+In order to visualize the distribution of words with positive and negative polarity within 5 words before and after "Capitu", I decided to create two bar plots, one with positive and the other with negative words. 
+
+To do so, I grouped both words into paragraphs, so that I could track changes from the begging to the end.
+```{r fig.align="center", fig.width=12, fig.height=6}
+# Positive words
+sentiment_words_near_capitu_positive <- sentiment_words_near_capitu %>%
+  filter(polarity == "1") %>%
+  group_by(paragraph_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# Graph positive
+capitu_positive <- ggplot(sentiment_words_near_capitu_positive, aes(x = paragraph_id, y = n)) +
+  geom_bar(stat = "identity", color = "green") +
+  labs(title = "Positive words distribution (Capitu)",
+       x = "Paragraphs",
+       y = "Number of positive words near Capitu") +
+  theme_minimal()
+
+# Negative words
+sentiment_words_near_capitu_negative <- sentiment_words_near_capitu %>%
+  filter(polarity == "-1") %>%
+  group_by(paragraph_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# Graph negative
+capitu_negative <- ggplot(sentiment_words_near_capitu_negative, aes(x = paragraph_id, y = n)) +
+  geom_bar(stat = "identity", color = "red") +
+  labs(title = "Negative words distribution (Capitu)",
+       x = "Paragraphs",
+       y = "Number of negative words near Capitu") +
+  theme_minimal()
+```
+
+## Gramatical categories
+As a last part of the analysis, I decided to check which grammatical categories most occurred before and after "Capitu". In this case, I left punctuation (`PUNCT`), articles (`DET`) and pronouns (`PRON`) out. 
+```{r}
+# words before "Capitu"
+words_before_capitu <- dom_casmurro_pos %>%
+  mutate(word_before = lag(token), pos_before = lag(upos), lemma_before = lag(lemma)) %>%
+  filter((!pos_before == "PUNCT" & !pos_before == "DET" & !pos_before == "PRON") & token == "Capitu")  %>%
+  select(paragraph_id, sentence, word_before, pos_before, lemma_before) %>% 
+  mutate(word_before = str_to_lower(word_before))
+
+words_before_capitu %>% 
+  count(pos_before, sort = TRUE) 
+
+# words after "Capitu"
+words_after_capitu <- dom_casmurro_pos %>% 
+  mutate(word_after = lead(token), pos_after = lead(upos), lemma_after = lead(lemma)) %>% 
+  filter(token == "Capitu" & (!pos_after == "PUNCT" & !pos_after == "DET" & !pos_after == "PRON")) %>% 
+  select(paragraph_id, sentence, word_after, pos_after, lemma_after) %>% 
+  mutate(word_after = str_to_lower(word_after))
+
+words_after_capitu %>% 
+  count(pos_after, sort = TRUE) 
+```
+
+# Data interpretation
+To interpret the data, I will answer questions a, b and c.
+
+## Word count
+  **a. What do the most frequent content words in the book suggest about its story?**
+
+- The high frequency of Capitu's name suggests she is frequently mentioned by Bentinho, emphasizing her role as the focus of his **attention**, **reflection**, and **obsession**, and it also reflects the narrative bias of the text, which is told from Bentinho's point of view.
+
+- Her constant mention might indicate Bentinho's attempt to understand or justify his own insecurities and suspicions.
+```{r}
+dom_casmurro_pos_content_words %>% 
+  count(token, sort = TRUE) %>% 
+  filter (n > 50) %>% 
+  ggplot(aes(label = token, size = n)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 10) + 
+  theme_linedraw()
+```
+
+## Sentiment analysis
+  **b. Are there more positive/negative words in specific parts of the story?**
+  
+- The scattered sentiment might be reflecting the central theme of doubt and uncertainty that runs through the novel. 
+
+- Bentinho’s feelings toward Capitu are never entirely clear, and this lack of a clear positive or negative trajectory could mirror his conflicting emotions and the ambiguous nature of their relationship. 
+
+- The inconsistent distribution of sentiment could symbolize Bentinho's fluctuating feelings of love, jealousy, suspicion, and obsession, making Capitu a more enigmatic character.
+
+- It possible that Bentinho is constructing Capitu’s image over time. 
+
+- The scattered nature of the sentiments could indicate that he is revealing different facets of her character in a subtle and gradual manner. This could be a narrative strategy to keep the reader engaged and unsure about Capitu’s true nature until key moments in the plot. 
+
+- Rather than a linear build-up of emotions (positive to negative), the feelings could be fragmented, showing how Bentinho’s view of her oscillates over time, based on his own emotional and psychological state.
+
+- Machado de Assis could be using this scattered sentiment as a way to **keep the reader on edge**, much like Bentinho is throughout the novel. By not allowing the reader to settle into a clear pattern of emotions toward Capitu, he also highlights the uncertainty and suspicion that permeate the narrative. This uncertainty could make the eventual twist in the story (regarding Capitu’s alleged betrayal) even more powerful, as the reader has been unsure of what to believe.
+```{r fig.align="center", fig.width=12, fig.height=6}
+# The whole book
+dom_casmurro_positive + dom_casmurro_negative
+
+# Capitu
+capitu_positive + capitu_negative
+```
+
+## Gramatical categories
+  **c. Which grammatical categories co-ocurr more often with "Capitu" and what could it indicate?**
+  
+- The grammatical categories surrounding "Capitu"—both before and after her mention—highlight the narrative’s emphasis on **actions** rather than direct physical descriptions or objects. 
+
+- **Verbs** are the most prominent category, indicating that the focus of the narrative is on the dynamic events, actions, and states associated with Capitu. 
+
+- The occurrence of adjectives and substantives is minimal, which suggests that the narrative seems to shift slightly towards a less direct description of her.
+
+- Additionally, auxiliary verbs indicate that the unfolding events related to her are often framed in past or hypothetical terms, giving the narrative a temporal or conditional quality.
+
+- This suggests that she is a central figure whose role in the story is defined more by **what she does** and the situations she finds herself in, rather than by detailed descriptions of her appearance or qualities.
+
+```{r}
+# Before
+words_before_capitu %>% 
+  count(pos_before, sort = TRUE)
+
+# After
+words_after_capitu %>% 
+  count(pos_after, sort = TRUE) 
+```
+
+### Examples
+- Então Capitu **abanava** a cabeça com uma grande expressão de desengano e melancolia, tanto mais de espantar quanto que tinha os cabelos realmente admiráveis; mas eu retorquia chamando-lhe maluca. (*Then Capitu waved her head with a great expression of disillusionment and melancholy, all the more surprising because she had really admirable hair; but I retorted by calling her crazy.*)
+
+- Capitu **ria** alto, **falava** alto, como se me avisasse; eu continuava surdo, a sós comigo e o meu desprezo. (*Capitu laughed loudly, spoke loudly, as if to warn me; I remained deaf, alone with myself and my contempt.*)
+
+- Capitu **tinha** os olhos no chão. (*Capitu had her eyes on the floor.*)
+
+- Capitu **preferia** tudo ao seminário. (*Capitu preferred everything to the seminary.*)
+
+- Capitu **fez** um gesto de impaciência. (*Capitu gestured impatiently.*)
+
+- Não obstante, achei que Capitu **estava** um tanto impaciente por descer. (*Nevertheless, I thought Capitu was a little impatient to get downstairs.*)
+
+- Capitu **refletia**, **refletia**, **refletia**... (*Capitu reflected, reflected, reflected...*)
+
+
+# Conclusion
+#### *(How)* Does Bentinho's description of Capitu evolve throughout *Dom Casmurro*?
+
+The evolution of Bentinho's description of Capitu does not follow a clear, linear pattern. Instead, it fluctuates based on his perceptions, emotions, and the narrative's progression.
+
+The lack of a consistent evolving pattern reflects the subjective nature of Bentinho’s perspective. As the narrator of the story, his interpretations of Capitu are shaped by his own biases, experiences, and mental state, making it difficult to pinpoint a clear evolution in his descriptions.
+
+# Limitations
+The analysis focused on specific words (such as "Capitu") might overlook other words or aspects that could also be relevant to the study of the text.
+
+Frequently occurring words may not necessarily be the most significant for the interpretative analysis of the text.
+
+Frequency analyses by categories (such as prepositions or verbs) may fail to capture the stylistic and thematic depth of the narrative.
+
+Comparing Dom Casmurro with other works by Machado could provide additional insights.
+
+# Sources
+Gonzaga, S. 2022. Package ‘lexiconPT’. CRAN. Retrieved from https://cran.r-project.org/web/packages/lexiconPT/lexiconPT.pdf
+
+Kauffmann, Carlos Henrique. Linguística de corpus e estilo: análises multidimensional e canônica na ficção de Machado de Assis. 2020. PhD diss., Programa de Estudos Pós-Graduados em Linguística Aplicada e Estudos da Linguagem, Pontifícia Universidade Católica de São Paulo.
+
+Schweinberger, Martin. 2023. POS-Tagging and Syntactic Parsing with R. Brisbane: The University of Queensland. url: https://ladal.edu.au/pos.html (Version 2023.05.31).
+
+The New York Times. Image from report - Book Review: 'Dom Casmurro,' by Machado de Assis - The New York Times. The New York Times, https://static01.nyt.com/images/2023/07/02/multimedia/02rovingeye-moser/23rovingeye-moser-qbfk-mediumSquareAt3X.jpg. Accessed 17 Nov. 2024.
+
+Viana, V., Fausto, F., & Zyngier, S. 2007. Corpus linguistics & literature: A contrastive analysis of Dan Brown and Machado de Assis. In S. Zyngier, V. Viana, & J. Jandre (Eds.), Textos e leituras: Estudos empíricos de língua e literatura (pp. 233-256). Publit.
+
+Wickham, H., & Grolemund, G. (n.d.). R for Data Science: Data visualization. Retrieved from https://djvill.github.io/r4ds/data-visualisation.html
+
+<div style="text-align: center;">
+  <img src="https://t3.ftcdn.net/jpg/02/91/52/22/360_F_291522205_XkrmS421FjSGTMRdTrqFZPxDY19VxpmL.jpg" alt="Book cover" width="300"/>
+</div>
+
+```{r}
+sessionInfo()
+```
+
