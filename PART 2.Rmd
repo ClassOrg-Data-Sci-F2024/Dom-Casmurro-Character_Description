@@ -2,7 +2,7 @@
 title: "data wrangling"
 author: "LUIZA DIVINO"
 date: "2024-11-19"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +11,7 @@ library(tidyverse)
 library(tidytext)
 library(pdftools)
 library(tibble)
-library (stringr)
+library(stringr)
 library(dplyr)
 library(stopwords)
 library(udpipe)
@@ -70,11 +70,8 @@ dom_casmurro_words_filtered <- dom_casmurro_words %>%
   filter(!word %in% stopwords_pt)
 ```
 
-  4. For the corpus to be tagged, I chose the `portuguese-bosque` language model because it is a Portuguese treebank that includes both Brazilian and European Portuguese.
+  4. For the corpus to be tagged, I chose the `portuguese-bosque` language model because it is a Portuguese Treebank that includes both Brazilian and European Portuguese.
 ```{r}
-# Activating klippy for copy-to-clipboard button
-klippy::klippy()
-
 # Downloading model
 port_model <- udpipe_download_model(language = "portuguese-bosque")
 
@@ -85,6 +82,26 @@ port <- udpipe_load_model(file = port_model$file_model)
 dom_casmurro_pos <- udpipe::udpipe_annotate(port, x = dom_casmurro_text) %>% 
   as.data.frame()
 ```
+
+# trying to get words from pos version o the orpus IT WORKED LETS USE THIS ONE
+```{r}
+dom_casmurro_pos_filtered <- dom_casmurro_pos %>%
+  #filter(upos == "NOUN" | upos == "AJD" | upos == "ADV") %>% 
+  select(token) %>% 
+  mutate(token = str_to_lower(token)) %>% 
+  count(token) %>% 
+  inner_join(lexiconPT::oplexicon_v3.0, by = c("token" = "term"))
+
+#%>% 
+#  mutate(lemma = str_to_lower(lemma)) %>% 
+ 
+   #count(lemma, sort = TRUE) %>% 
+  #inner_join(lexiconPT::oplexicon_v3.0, by = c("lemma" = "term"))
+
+dom_casmurro_pos_filtered %>% 
+  count(polarity)
+```
+
 
 # Data analysis
 
@@ -107,7 +124,163 @@ dom_casmurro_words_filtered %>%
   theme_minimal()
 ```
 
-## Capitu
+### TENTATIVA sentiment
+```{r}
+
+dom_casmurro_words_filtered_unique <- dom_casmurro_words_filtered %>% 
+  count(word)
+  
+
+sentiment_dom_casmurro_oplexicon_v3.0 <- dom_casmurro_words_filtered_unique %>% 
+  inner_join(lexiconPT::oplexicon_v3.0, by = c("word" = "term"))
+
+sentiment_dom_casmurro_oplexicon_v2.1 <- dom_casmurro_words_filtered_unique %>% 
+  inner_join(lexiconPT::oplexicon_v2.1, by = c("word" = "term"))
+
+sentiment_dom_casmurro_sentiLex_lem_PT02 <- dom_casmurro_words_filtered_unique %>% 
+  inner_join(lexiconPT::sentiLex_lem_PT02, by = c("word" = "term"))
+
+
+sentiment_dom_casmurro_oplexicon_v3.0 %>% 
+  count(polarity)
+
+sentiment_dom_casmurro_oplexicon_v2.1 %>% 
+  count(polarity)
+
+sentiment_dom_casmurro_sentiLex_lem_PT02 %>% 
+  count(polarity)
+
+??oplexicon_v3.0
+
+summarise(sentiment_dom_casmurro_oplexicon_v2.1)
+print(sentiment_dom_casmurro_oplexicon_v2.1)
+
+
+
+```
+
+
+### CONTAGEM POS
+```{r}
+dom_casmurro_pos %>% 
+  count(upos)
+```
+
+
+
+### verbs, nouns and ajdectives before capitu
+```{r}
+V_N_A_before_capitu <- dom_casmurro_pos %>%
+  mutate(word_before = lag(token), pos_before = lag(upos), lemma_before = lag(lemma)) %>%
+  filter((pos_before == "VERB" | pos_before == "NOUN" | pos_before == "ADJ") & token == "Capitu")  %>%
+  select(paragraph_id, sentence, word_before, pos_before, lemma_before)
+
+V_N_A_before_capitu %>% 
+  count(word_before)
+
+# sentiment analysis verbs, nouns, adjectives before
+
+capitu_sentiments_V_N_A_before <- V_N_A_before_capitu %>%
+  inner_join(lexiconPT::oplexicon_v3.0, by = c("lemma_before" = "term"))
+
+
+?lexiconPT::oplexicon_v3.0
+
+dom_casmurro_pos %>% 
+  count(upos)
+
+```
+
+### words before capitu
+```{r}
+words_before_capitu <- dom_casmurro_pos %>%
+  mutate(word_before = lag(token), pos_before = lag(upos), lemma_before = lag(lemma)) %>%
+  filter(pos_before == "VERB" & token == "Capitu")  %>%
+  select(paragraph_id, sentence, word_before, pos_before, lemma_before)
+```
+
+
+#### words after capitu
+```{r}
+words_after_capitu <- dom_casmurro_pos %>%
+  mutate(next_word = lead(token), next_pos = lead(upos), next_lemma = lead(lemma)) %>%
+  filter(token == "Capitu" & (next_pos == "VERB" | next_pos == "NOUN" | next_pos == "ADJ")) %>%
+  select(paragraph_id, sentence, next_word, next_pos, next_lemma)
+
+words_after_capitu %>% 
+  count(next_word)
+
+# sentiment analysis words after
+capitu_sentiments_after <- words_after_capitu %>%
+  inner_join(lexiconPT::oplexicon_v3.0, by = c("next_lemma" = "term"))
+```
+
+
+
+#### Verbs before Capitu
+```{r}
+verbs_before_capitu <- dom_casmurro_pos %>%
+  mutate(verb_before = lag(token), pos_before = lag(upos)) %>%
+  filter(pos_before == "VERB" & token == "Capitu")  %>%
+  select(paragraph_id, sentence, verb_before)
+
+# wordcloud
+verbs_before_capitu %>% 
+  count(verb_before, sort = TRUE) %>% 
+  ggplot(aes(label = verb_before, size = n)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 10) + 
+  theme_minimal()
+
+```
+
+#### Verbs after Capitu
+In this specific part, I decided to leave `paragraph_id` to track in which part of the story everything tha verb was used so that I can see if there were any changes chronologically.
+```{r}
+verbs_after_capitu <- dom_casmurro_pos %>%
+  mutate(next_verb = lead(token), next_pos = lead(upos)) %>%
+  filter(token == "Capitu" & next_pos == "VERB") %>%
+  select(paragraph_id, sentence, next_verb)
+
+
+# wordcloud verbs before
+verbs_after_capitu %>% 
+  count(next_verb, sort = TRUE) %>% 
+  ggplot(aes(label = next_verb, size = n)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 10) + 
+  theme_minimal()
+
+```
+
+
+### testando 
+
+```{r}
+capitu_sentiments <- capitu_context_clean %>%
+  inner_join(lexiconPT::oplexicon_v3.0, by = c("word" = "term")) %>%
+  count(polarity, sort = TRUE)
+```
+
+
+
+
+
+#### olhos
+```{r}
+olhos <- dom_casmurro_pos %>%
+  mutate(next_prep = lead(token), next_pos = lead(upos)) %>%
+  filter(token == "olhos" & next_pos == "ADP") %>%
+  select(paragraph_id, sentence, next_prep)
+
+# olhos de
+olhos %>% 
+  filter(token == "olhos" & token == "de") 
+```
+
+
+
+## Capitu ACHO QUE PODE APAGAR ISTO
 After seeing the wordcloud, I decided to look for specific terms with "Capitu"
 ```{r}
 capitu_data <- dom_casmurro_pos %>% 
@@ -120,23 +293,13 @@ dom_casmurro_pos %>%
   head()
 ```
 
-#### Verbs after Capitu
-```{r}
-verbs_after_capitu <- dom_casmurro_pos %>%
-  mutate(next_word = lead(sentence), next_pos = lead(upos)) %>%
-  filter(token == "Capitu" & next_pos == "VERB") %>%
-  select(sentence, next_word, next_pos)
-
-print(verbs_after_capitu)
-```
-
-#### Olhos
+#### Olhos ACHO QUE PODE APAGAR
 ```{r}
 dom_casmurro_pos %>%
   mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}Capitu.*?olhos(\\s+\\b\\w+\\b){0,10}")) %>%
   filter(!is.na(context)) %>%
-  select(context) %>%
-  head()
+  select(context)
+
 ```
 
 First, I try to detect occurences of "Capitu" and "olhos" (eyes), because going throuth the data, it is possible to see how much the narrator talks about her eyes.
@@ -144,8 +307,7 @@ First, I try to detect occurences of "Capitu" and "olhos" (eyes), because going 
 dom_casmurro_pos %>%
   mutate(context = str_extract(sentence, "(\\b\\w+\\b\\s+){0,10}olhos.*?Capitu(\\s+\\b\\w+\\b){0,10}")) %>%
   filter(!is.na(context)) %>%
-  select(context) %>%
-  head()
+  select(context) 
 ```
 
 ```{r}
@@ -162,6 +324,44 @@ dom_casmurro_pos %>%
   filter(!is.na(context)) %>%
   select(context) %>%
   head()
+```
+
+
+### LexiconPt
+```{r}
+get_word_sentiment <- function(word,
+                               dictionary = c("all", "oplexicon_v2", "oplexicon_v3",
+                                              "sentilex"))
+
+get_word_sentiment("cantar")
+?get_word_sentiment
+??SentimentAnalysis
+?txt_sentiment
+```
+
+test
+```{r}
+# Detectar palavras em um raio de 5 palavras ao redor de "Capitu"
+words_near_capitu <- dom_casmurro_pos %>%
+  # Criar IDs únicos para a posição de cada token
+  mutate(token_id = row_number()) %>%
+  # Filtrar apenas as linhas com "Capitu"
+  filter(token == "Capitu") %>%
+  # Expandir para capturar o raio de 5 palavras antes e depois
+  rowwise() %>%
+  mutate(
+    tokens_around = list(
+      dom_casmurro_pos %>%
+        filter(token_id >= token_id - 5 & token_id <= token_id + 5) %>% # Raio de 5 palavras
+        pull(token) # Extrair apenas os tokens
+    )
+  ) %>%
+  unnest(tokens_around) %>% # Expandir os tokens para análise
+  filter(tokens_around != "Capitu") %>% # Remover "Capitu" do contexto
+  count(tokens_around, sort = TRUE) # Contar a frequência das palavras ao redor
+
+# Exibir as palavras mais comuns ao redor de "Capitu"
+print(words_near_capitu)
 ```
 
 ```{r}

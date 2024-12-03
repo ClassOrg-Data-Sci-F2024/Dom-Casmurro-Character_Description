@@ -51,6 +51,7 @@ dom_casmurro_pdf <- pdf_text("data/domCasmurro.pdf")
 
 # use cat to have a preview of the first page
 cat(dom_casmurro_pdf[1])
+??cat
 
 ?udpipe_load_model
 ```
