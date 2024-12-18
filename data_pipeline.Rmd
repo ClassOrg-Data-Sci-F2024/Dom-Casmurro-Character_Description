@@ -1,0 +1,454 @@
+---
+title: "Data Pipeline"
+subtitle: "Final Result"
+author: "LUIZA DIVINO"
+date: "2024-12-16"
+output: 
+  github_document:
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pdftools)
+library(tidyverse)
+library(udpipe)
+library(ggwordcloud)
+library(lexiconPT)
+library(patchwork)
+library(pander)
+```
+
+# Project details
+This project is on the book *Dom Casmurro* by Machado de Assis (1839-1908), a Brazilian author. It is narrated by Bento Santiago, or **Bentinho**, an older man who reflects on his life, particularly his relationship with **Capitu**, a childhood friend who becomes his wife. Bentinho recounts his deep love for Capitu, but the story takes a darker turn as he becomes consumed by jealousy and suspicion that Capitu had an affair with his best friend, **Escobar**. He believes Escobar to be the father of his son, **Ezekiel**, due to the boy's physical resemblance to Escobar. However, the narrative is marked by Bentinho's unreliable perspective, leaving readers to question whether his suspicions are true or products of his paranoia. The novel explores themes of love, betrayal, memory, and the ambiguity of truth.
+
+This project aims to track linguistic differences throughout the story, focusing on *positive* and *negative* polarity words per chapter and also near the word **Capitu**.
+
+# Raw data overview
+*Dom Casmurro* was published in 1899, which means it is a public domain content. I was able to download it in PDF format through the [Brazilian Ministry of Education page](http://www.dominiopublico.gov.br/pesquisa/DetalheObraForm.do?select_action&co_obra=1888). The book has **128 chapters**. 
+
+# Uploading data and using a POS-tagger
+For the purpose of this project, I needed to transform the data into a format that could be tagged. I first uploaded the book in PDF format, then I transformed it into a tibble dataframe divided by page. The last step before using the POS-tagger was to flatten the data so that the sentences wouldn't be segmented in different pages. Then, I downloaded a Portuguese Language Model and annotated the data. There were some columns that wouldn't be very useful for this project, so I decided to leave just the columns that would be useful for the analysis. Because the `udpipe` package is not meant to tag books specifically, I had to create a column to access each chapter.
+```{r}
+# uploading the pdf format
+dom_casmurro_pdf <- pdf_text("data/domCasmurro.pdf")
+
+# tibble data into page
+dom_casmurro_pages <- tibble(page = 1:length(dom_casmurro_pdf), text = dom_casmurro_pdf)
+
+# flatten data into plain text
+dom_casmurro_text <- str_flatten(dom_casmurro_pages$text)
+
+# downloading model
+port_model <- udpipe_download_model(language = "portuguese-bosque")
+
+# loading model
+port <- udpipe_load_model(file = port_model$file_model)
+
+# using the POS-tagger
+dom_casmurro_pos <- udpipe::udpipe_annotate(port, x = dom_casmurro_text) %>% 
+  as.data.frame()
+
+# selecting columns that will be used
+dom_casmurro_pos <- select(
+  dom_casmurro_pos, 
+  "paragraph_id",
+  "sentence_id",
+  "sentence",
+  "token_id",
+  "token",
+  "lemma",
+  "upos")
+  
+# creating variable chapter_id: "capítulo" means "chapter" in Portuguese
+# I knew the chapter had 148 chapters and when using "count" it showed only 147, so I had to manually find out where the problem was
+# I found that one of the chapters (in Portuguese, "Chapter" is "Capítulo")
+dom_casmurro_pos <- dom_casmurro_pos %>%
+  mutate(
+    is_new_chapter = str_detect(sentence, "^CAPÍTULO") | str_detect(sentence, "CAPÍTULO XXXVI"),
+    chapter_id = cumsum(is_new_chapter & sentence != lag(sentence, default = ""))
+  )
+```
+
+# Transformed data overview
+After transforming the data into the version I used for the analysis, I was left with 17 different tags, 148 chapters, and 1510 paragraphs.
+```{r}
+# different tags
+unique(dom_casmurro_pos$upos)
+
+# number of chapters
+unique(dom_casmurro_pos$chapter_id)
+
+# number of paragraphs
+n_distinct(dom_casmurro_pos$paragraph_id)
+```
+
+# Selecting which grammatical categories will be included for the content word count
+When trying to access content words, grammatical categories like, for example, verbs, prepositions, and articles are not included, so after analyzing all the tags, I decided to select only nouns, proper names and adjectives.
+```{r}
+# selecting grammatical categories that are useful for content word count
+dom_casmurro_pos_content_words <- dom_casmurro_pos %>%
+  filter(upos == "PROPN" | upos == "NOUN" | upos == "ADJ") %>% 
+  select(token, upos) %>% 
+  mutate(token = str_to_lower(token)) 
+```
+
+# Content word analysis
+First of all, I wanted to check what the most frequent content words were.
+```{r}
+# List with most frequent words, regardless of the grammatical category
+dom_casmurro_pos_content_words %>% 
+  count(token, sort = TRUE) %>% 
+  head(10)
+
+# List most frequent nouns
+dom_casmurro_pos_content_nouns <- dom_casmurro_pos_content_words%>% 
+  filter(upos == "NOUN") %>% 
+  select(token) 
+
+dom_casmurro_pos_content_nouns %>% 
+  count(token, sort = TRUE) %>% 
+  head(10)
+
+# List most frequent proper names
+dom_casmurro_content_pos_propn <- dom_casmurro_pos_content_words %>% 
+  filter(upos == "PROPN") %>% 
+  select(token)
+
+dom_casmurro_content_pos_propn %>% 
+  count(token, sort = TRUE) %>% 
+  head(10)
+
+# List most frequent proper names
+dom_casmurro_content_pos_adj <- dom_casmurro_pos_content_words %>% 
+  filter(upos == "ADJ") %>% 
+  select(token)
+
+dom_casmurro_content_pos_adj %>% 
+  count(token, sort = TRUE) %>% 
+  head(10)
+
+# Wordcloud including content words that occurred more than 50 times, regardless of the grammatical category
+dom_casmurro_pos_content_words %>% 
+  count(token, sort = TRUE) %>% 
+  filter (n > 50) %>% 
+  ggplot(aes(label = token, size = n)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 10) + 
+  theme_linedraw()
+```
+
+# Sentiment Analysis
+To find out if the there were more positive or negative polarity words in different parts of the story, the first step was to do a sentiment analysis. Then, I created two different dataframes: one containing words with positive polarities and one with words with negative polarities. Next, I grouped the words into chapters to track in which parts of the story there were more positive or negative polarity terms.
+```{r}
+# running the Sentiment Analysis
+dom_casmurro_pos_sentiment_oplexicon_v3.0 <- dom_casmurro_pos %>% 
+  inner_join(oplexicon_v3.0, by = c("token" = "term"),
+             relationship = "many-to-many")
+
+# finding out which grammatical categories remained
+dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  count(upos, sort = TRUE) 
+
+# counting words by polarity
+dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  count(polarity) 
+
+# selecting important columns
+dom_casmurro_pos_sentiment_oplexicon_v3.0 <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  select(paragraph_id, sentence_id, chapter_id, sentence, token, upos, type, polarity)
+
+# printing a small part of the dataframe
+pander(head(dom_casmurro_pos_sentiment_oplexicon_v3.0, 10), caption = "dom_casmurro_pos_sentiment_oplexicon_v3.0")
+
+# positive words
+dom_casmurro_pos_sentiment_oplexicon_v3.0_positive <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  filter(polarity == "1")
+
+dom_casmurro_pos_sentiment_oplexicon_v3.0_positive %>% 
+  count(token, sort = TRUE) %>% 
+  head(n = 10)
+
+# grouping positive words by chapter
+dom_casmurro_pos_sentiment_oplexicon_v3.0_positive_chapters <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>%
+  filter(polarity == "1") %>%
+  group_by(chapter_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# negative words
+dom_casmurro_pos_sentiment_oplexicon_v3.0_negative <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  filter(polarity == "-1")
+
+dom_casmurro_pos_sentiment_oplexicon_v3.0_negative %>% 
+  count(token, sort = TRUE) %>% 
+  head(n = 10)
+
+# grouping negative words by chapter
+dom_casmurro_pos_sentiment_oplexicon_v3.0_negative_chapters <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>%
+  filter(polarity == "-1") %>%
+  group_by(chapter_id) %>%
+  count(polarity) %>%
+  ungroup() 
+
+# combining both positive and negative dataframes to create a plot with both
+dom_casmurro_pos_sentiment <- bind_rows(
+  mutate(dom_casmurro_pos_sentiment_oplexicon_v3.0_positive_chapters, Sentiment = "Positive"),
+  mutate(dom_casmurro_pos_sentiment_oplexicon_v3.0_negative_chapters, Sentiment = "Negative")
+)
+
+# chapters with more positive words
+dom_casmurro_pos_sentiment %>%
+  filter(Sentiment == "Positive") %>%   
+  group_by(chapter_id) %>%            
+  summarise(total_positive_words = sum(n)) %>%  
+  arrange(desc(total_positive_words)) 
+
+# chapters with more negative words
+dom_casmurro_pos_sentiment %>%
+  filter(Sentiment == "Negative") %>%   
+  group_by(chapter_id) %>%               
+  summarise(total_negative_words = sum(n)) %>%  
+  arrange(desc(total_negative_words)) 
+
+# creating a plot with both positive and negative words in each chapter
+ggplot(dom_casmurro_pos_sentiment, aes(x = chapter_id, y = n, fill = Sentiment)) +
+  geom_bar(stat = "identity", position = "stack") +  
+  labs(title = "Positive and Negative Words Distribution",
+       x = "Chapters",
+       y = "Number of Positive and Negative Words") +
+  scale_fill_manual(values = c("Positive" = "#70c13f", "Negative" = "red")) +  
+  theme_gray()
+
+# top 5 chapters with the biggest amount of positive polarity words
+top_positive_chapters <- dom_casmurro_pos_sentiment %>%
+  filter(Sentiment == "Positive") %>%
+  group_by(chapter_id) %>%
+  summarise(total_positive_words = sum(n)) %>%
+  arrange(desc(total_positive_words)) %>%
+  slice_head(n = 5) %>%
+  pull(chapter_id)
+
+# top 5 chapters with the biggest amount of positive polarity words
+top_negative_chapters <- dom_casmurro_pos_sentiment %>%
+  filter(Sentiment == "Negative") %>%
+  group_by(chapter_id) %>%
+  summarise(total_negative_words = sum(n)) %>%
+  arrange(desc(total_negative_words)) %>%
+  slice_head(n = 5) %>%
+  pull(chapter_id)
+
+# combining both dataframes
+top_sentiment_chapters <- dom_casmurro_pos_sentiment %>%
+  filter(chapter_id %in% c(top_positive_chapters, top_negative_chapters))
+
+# plot with both top 5 positive and negative
+ggplot(top_sentiment_chapters, aes(x = factor(chapter_id), y = n, fill = Sentiment)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Chapters with the biggest amount of positive polarity words X 
+       Chapters with the biggest amount of negative polarity words",
+       x = "Chapters",
+       y = "Number of Positive and Negative Words") +
+  scale_fill_manual(values = c("Positive" = "#70c13f", "Negative" = "red")) +
+  theme_grey()
+```
+
+# Words near Capitu
+I was also interested to see which words occurred close to "Capitu" and if those words were more positive or negative. I chose a range to keep only words within 5 positions before or after. I also divided the data into two different dataframes, one containing only negative polarity words and the other containing only positive polarity words.
+```{r}
+# selecting words within 5 positions before and after "Capitu"
+dom_casmurro_pos <- dom_casmurro_pos %>%
+  mutate(token_id_total = row_number())
+
+context_capitu <- dom_casmurro_pos %>%
+  filter(token == "Capitu") %>%
+  select(token_id_capitu = token_id_total, chapter_id) %>%
+  inner_join(dom_casmurro_pos, by = "chapter_id", relationship = "many-to-many") %>%
+  filter(token_id_total >= token_id_capitu - 5 & token_id_total <= token_id_capitu + 5) %>%
+  filter(token != "Capitu") %>%
+  select(paragraph_id, chapter_id, token, token_id, token_id_total, token_id_capitu, upos)
+
+# printing a small part of the dataframe
+pander(head(context_capitu, 10), caption = "capitu_context")
+
+# sentiment analysis with words near "Capitu"
+sentiment_words_near_capitu <- context_capitu %>% 
+  inner_join(lexiconPT::oplexicon_v3.0, by = c ("token" = "term"))
+
+sentiment_words_near_capitu %>% 
+  count(polarity)
+
+# positive words
+sentiment_words_near_capitu_positive <- sentiment_words_near_capitu %>%
+  filter(polarity == "1") %>%
+  group_by(chapter_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# negative words
+sentiment_words_near_capitu_negative <- sentiment_words_near_capitu %>%
+  filter(polarity == "-1") %>%
+  group_by(chapter_id) %>%
+  count(polarity) %>%
+  ungroup()
+
+# combining both positive and negative dataframes to create a plot with both
+capitu_sentiment <- bind_rows(
+  mutate(sentiment_words_near_capitu_positive, Sentiment = "Positive"),
+  mutate(sentiment_words_near_capitu_negative, Sentiment = "Negative")
+)
+
+# creating a plot with both positive and negative words in each chapter
+ggplot(capitu_sentiment, aes(x = chapter_id, y = n, fill = Sentiment)) +
+  geom_bar(stat = "identity", position = "stack") +  
+  labs(title = "Positive and Negative Words Distribution (Capitu)",
+       x = "Chapters",
+       y = "Number of Positive and Negative Words") +
+  scale_fill_manual(values = c("Positive" = "#70c13f", "Negative" = "red")) +  
+  theme_gray()
+
+# top 5 positive
+capitu_top_positive_chapters <- capitu_sentiment %>%
+  filter(Sentiment == "Positive") %>%
+  group_by(chapter_id) %>%
+  summarise(total_negative_words = sum(n)) %>%
+  arrange(desc(total_negative_words)) %>%
+  slice_head(n = 5) %>%
+  pull(chapter_id)
+
+# top 5 negative
+capitu_top_negative_chapters <- capitu_sentiment %>%
+  filter(Sentiment == "Negative") %>%
+  group_by(chapter_id) %>%
+  summarise(total_negative_words = sum(n)) %>%
+  arrange(desc(total_negative_words)) %>%
+  slice_head(n = 5) %>%
+  pull(chapter_id)
+
+#combining both
+top_sentiment_capitu_chapters <- capitu_sentiment %>%
+  filter(chapter_id %in% c(capitu_top_positive_chapters, capitu_top_negative_chapters))
+
+# plot with both top 5 positive and negative
+ggplot(top_sentiment_capitu_chapters, aes(x = factor(chapter_id), y = n, fill = Sentiment)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Chapters with the biggest amount of positive polarity words near Capitu X 
+       Chapters with the biggest amount of negative polarity words near Capitu",
+       x = "Chapters",
+       y = "Number of Positive and Negative Words") +
+  scale_fill_manual(values = c("Positive" = "#70c13f", "Negative" = "red")) +
+  theme_grey()
+```
+
+# Words right after and right before "Capitu"
+As a last part of the analysis, I decided to check which grammatical categories most occurred before and after "Capitu". In this case, I left punctuation (`PUNCT`), articles (`DET`) and pronouns (`PRON`) out.
+```{r}
+# words before "Capitu"
+words_before_capitu <- dom_casmurro_pos %>%
+  mutate(word_before = lag(token), pos_before = lag(upos), lemma_before = lag(lemma)) %>%
+  filter((!pos_before == "PUNCT" & !pos_before == "DET" & !pos_before == "PRON") & token == "Capitu")  %>%
+  select(paragraph_id, chapter_id, sentence, word_before, pos_before, lemma_before) %>% 
+  mutate(word_before = str_to_lower(word_before))
+
+words_before_capitu %>% 
+  count(pos_before, sort = TRUE) 
+
+# words after "Capitu"
+words_after_capitu <- dom_casmurro_pos %>% 
+  mutate(word_after = lead(token), pos_after = lead(upos), lemma_after = lead(lemma)) %>% 
+  filter(token == "Capitu" & (!pos_after == "PUNCT" & !pos_after == "DET" & !pos_after == "PRON")) %>% 
+  select(paragraph_id, chapter_id, sentence, word_after, pos_after, lemma_after) %>% 
+  mutate(word_after = str_to_lower(word_after))
+
+words_after_capitu %>% 
+  count(pos_after, sort = TRUE) 
+```
+
+
+```{r}
+# SAVING TABLES AS PNG FOR THE REPORT
+library(flextable)
+library(webshot)
+
+# polarity count
+polarity_count <- dom_casmurro_pos_sentiment_oplexicon_v3.0 %>% 
+  count(polarity)
+
+polarity_table <- flextable(polarity_count)
+
+save_as_image(polarity_table, path = "data/polarity_count.png")
+
+# most positive words throughout the text
+top_positive_chapters <- dom_casmurro_pos_sentiment %>%
+  filter(Sentiment == "Positive") %>%   
+  group_by(chapter_id) %>%            
+  summarise(total_positive_words = sum(n)) %>%  
+  arrange(desc(total_positive_words)) %>% 
+  slice_head(n = 5)
+
+polarity_table <- flextable(top_positive_chapters)
+
+save_as_image(polarity_table, path = "data/top_positive_chapters.png")
+
+# most negative words throughout the text 
+top_negative_chapters <- dom_casmurro_pos_sentiment %>%
+  filter(Sentiment == "Negative") %>%
+  group_by(chapter_id) %>%
+  summarise(total_negative_words = sum(n)) %>%
+  arrange(desc(total_negative_words)) %>%
+  slice_head(n = 5)
+
+polarity_table <- flextable(top_negative_chapters)
+
+save_as_image(polarity_table, path = "data/top_negative_chapters.png")
+
+# polarity count capitu
+count_polarity_capitu <-sentiment_words_near_capitu %>% 
+  count(polarity)
+
+count_polarity_capitu <- flextable(count_polarity_capitu)
+
+save_as_image(count_polarity_capitu, path = "data/count_polarity_capitu.png")
+
+# words before and after capitu
+words_before_capitu_print <- words_before_capitu %>% 
+  count(pos_before, sort = TRUE) 
+words_before_capitu_table <- flextable(words_before_capitu_print)
+save_as_image(words_before_capitu_table, path = "data/words_before_capitu.png")
+
+words_after_capitu_print <- words_after_capitu %>% 
+  count(pos_after, sort = TRUE)
+words_after_capitu_table <- flextable(words_after_capitu_print)
+save_as_image(words_after_capitu_table, path = "data/words_after_capitu.png")
+
+# words near capitu (positive and negative)
+capitu_top_positive_chapters <- capitu_sentiment %>%
+  filter(Sentiment == "Positive") %>%
+  group_by(chapter_id) %>%
+  summarise(total_positive_words = sum(n)) %>%
+  arrange(desc(total_positive_words)) %>%
+  slice_head(n = 5) 
+
+capitu_top_positive_chapters <- flextable(capitu_top_positive_chapters)
+
+save_as_image(capitu_top_positive_chapters, path = "data/capitu_top_positive_chapters.png")
+
+# top 5 negative
+capitu_top_negative_chapters <- capitu_sentiment %>%
+  filter(Sentiment == "Negative") %>%
+  group_by(chapter_id) %>%
+  summarise(total_negative_words = sum(n)) %>%
+  arrange(desc(total_negative_words)) %>%
+  slice_head(n = 5)
+
+capitu_top_negative_chapters <- flextable(capitu_top_negative_chapters)
+
+save_as_image(capitu_top_negative_chapters, path = "data/capitu_top_negative_chapters.png")
+
+```
+
+
+```{r}
+sessionInfo()
+```
+
